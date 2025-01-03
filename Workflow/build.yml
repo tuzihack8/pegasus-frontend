@@ -1,0 +1,76 @@
+name: Build Pegasus Frontend
+
+on:
+  push:
+    branches:
+      - main  # 触发工作流的分支
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]  # 支持的操作系统
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Qt
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.5.0'  # 指定 Qt 版本
+
+      - name: Set up Qt (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.5.0'
+          arch: 'win64_msvc2019_64'  # Windows 上的 Qt 架构
+
+      - name: Install dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential libgl1-mesa-dev
+
+      - name: Install dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install cmake
+
+      - name: Install dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System'
+
+      - name: Create build directory
+        run: mkdir build
+
+      - name: Configure CMake
+        working-directory: ./build
+        run: cmake ..
+
+      - name: Build project
+        working-directory: ./build
+        run: cmake --build . --config Release
+
+      - name: Run tests (optional)
+        working-directory: ./build
+        run: ctest --output-on-failure
+
+- name: Set up Android SDK
+  if: matrix.os == 'ubuntu-latest'
+  uses: android-actions/setup-android@v2
+
+- name: Build for Android
+  if: matrix.os == 'ubuntu-latest'
+  run: |
+    mkdir android-build
+    cd android-build
+    cmake -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake ..
+    cmake --build .
